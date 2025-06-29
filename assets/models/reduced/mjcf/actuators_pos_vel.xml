@@ -16,9 +16,13 @@
 
     <!-- Steering Motors (Position Control) -->
     <!-- 'kp' is the position feedback gain (stiffness). Control range is in radians. -->
-    <position name="FR_steer_motor" joint="FR_steer_joint" kp="10" dampratio="1" ctrllimited="true" ctrlrange="-3.14 3.14"/>
+    <!-- <position name="FR_steer_motor" joint="FR_steer_joint" kp="10" dampratio="1" ctrllimited="true" ctrlrange="-3.14 3.14"/>
     <position name="FL_steer_motor" joint="FL_steer_joint" kp="10" dampratio="1" ctrllimited="true" ctrlrange="-3.14 3.14"/>
     <position name="BR_steer_motor" joint="BR_steer_joint" kp="10" dampratio="1" ctrllimited="true" ctrlrange="-3.14 3.14"/>
-    <position name="BL_steer_motor" joint="BL_steer_joint" kp="10" dampratio="1" ctrllimited="true" ctrlrange="-3.14 3.14"/>
+    <position name="BL_steer_motor" joint="BL_steer_joint" kp="10" dampratio="1" ctrllimited="true" ctrlrange="-3.14 3.14"/> -->
+    <position name="FR_steer_motor" joint="FR_steer_joint" kp="10" dampratio="1"/>
+    <position name="FL_steer_motor" joint="FL_steer_joint" kp="10" dampratio="1"/>
+    <position name="BR_steer_motor" joint="BR_steer_joint" kp="10" dampratio="1"/>
+    <position name="BL_steer_motor" joint="BL_steer_joint" kp="10" dampratio="1"/>
   </actuator>
 </mujoco>

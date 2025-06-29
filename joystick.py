@@ -1,3 +1,4 @@
+import time
 import mujoco
 import mujoco.viewer
 import pygame
@@ -16,8 +17,8 @@ WHEEL_POSITIONS = np.array([
     [-0.2, -0.15]   # BL
 ])
 
-MAX_LINEAR_VELOCITY = 1.0  # m/s
-MAX_ANGULAR_VELOCITY = 4.0  # rad/s
+MAX_LINEAR_VELOCITY = 30.0  # m/s
+MAX_ANGULAR_VELOCITY = 300.0  # rad/s
 MAX_ROT_CENTER_OFFSET = 0.5 # meters
 
 # Actuator names from the XML file
@@ -62,11 +63,12 @@ def main():
     pygame.joystick.init()
 
     if pygame.joystick.get_count() == 0:
-        print("No joystick found. Please connect an Xbox controller.")
+        print("No joystick found. Please connect one.")
         return
 
-    joystick = pygame.joystick.Joystick(0)
+    joystick = pygame.joystick.Joystick(1)
     joystick.init()
+
     print(f"Initialized joystick: {joystick.get_name()}")
 
     # --- MuJoCo Initialization ---
@@ -95,8 +97,17 @@ def main():
                 data.eq_active[gantry_eq_id] = 1
                 # mujoco.mj_resetDataKeyframe(model, data, model.keyframe("home").id)
                 print("Releasing gantry")
+
     with mujoco.viewer.launch_passive(model, data, key_callback=key_cb) as viewer:
+        # Get the ID of the mocap body for the rotation center visualization.
+        try:
+            mocap_id = model.body("rotation_center_vis").mocapid[0]
+        except (KeyError, IndexError):
+            print("Warning: Mocap body 'rotation_center_vis' not found in the model. Visualization will be disabled.")
+            mocap_id = -1
+
         while running and viewer.is_running():
+            start_time = time.time()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
@@ -130,20 +141,52 @@ def main():
 
 
             # Apply deadzones and scaling
-            deadzone = 0.15
+            deadzone = 0.015
             vx = 0 if abs(vx) < deadzone else vx
             vy = 0 if abs(vy) < deadzone else vy
             px = 0 if abs(px) < deadzone else px
             py = 0 if abs(py) < deadzone else py
             omega = 0 if abs(omega) < deadzone else omega
 
-            linear_velocity = np.array([vx, vy]) * MAX_LINEAR_VELOCITY
+            linear_velocity_world_2d = np.array([vx, vy]) * MAX_LINEAR_VELOCITY
             angular_velocity = omega * MAX_ANGULAR_VELOCITY
             rotation_center = np.array([px, py]) * MAX_ROT_CENTER_OFFSET
-            
+
+            # --- Frame Transformation for World-Relative Control ---
+            # Get chassis orientation to transform world commands to the body frame.
+            chassis_quat = data.body("chassis").xquat
+
+            # Joystick linear velocity is in the world frame. It needs to be
+            # rotated into the robot's body frame for the inverse kinematics.
+            linear_velocity_world_3d = np.array([linear_velocity_world_2d[0], linear_velocity_world_2d[1], 0])
+            inv_chassis_quat = np.empty(4)
+            mujoco.mju_negQuat(inv_chassis_quat, chassis_quat)
+            linear_velocity_body_3d = np.empty(3)
+            mujoco.mju_rotVecQuat(linear_velocity_body_3d, linear_velocity_world_3d, inv_chassis_quat)
+            linear_velocity_body = linear_velocity_body_3d[:2]
+
+            # --- Update visualization for rotation center ---
+            if mocap_id != -1:
+                # The rotation_center is in the chassis frame.
+                # We need to transform it to the world frame for the mocap body.
+                chassis_pos = data.body("chassis").xpos
+
+                # Local position of rotation center
+                rot_center_local = np.array([rotation_center[0], rotation_center[1], 0])
+                
+                # Rotated offset in world frame
+                offset_world = np.empty(3)
+                mujoco.mju_rotVecQuat(offset_world, rot_center_local, chassis_quat)
+
+                # World position of rotation center
+                rot_center_world = chassis_pos + offset_world
+                
+                # Set the position of the mocap body
+                data.mocap_pos[mocap_id] = rot_center_world
+
             # --- Inverse Kinematics ---
             drive_speeds, steer_angles = swerve_inverse_kinematics(
-                linear_velocity, angular_velocity, rotation_center
+                linear_velocity_body, angular_velocity, rotation_center
             )
 
             # --- Control Optimization ---
@@ -175,6 +218,10 @@ def main():
             # --- Simulation Step ---
             mujoco.mj_step(model, data)
             viewer.sync()
+
+            time_until_next_sleep = model.opt.timestep - (time.time() - start_time)
+            if time_until_next_sleep > 0:
+                time.sleep(time_until_next_sleep)
 
     pygame.quit()
 

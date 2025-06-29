@@ -35,6 +35,11 @@
     <light diffuse=".5 .5 .5" pos="0 0 4" dir="0 0 -1"/>
     <geom name="floor" type="plane" size="5 5 0.1" material="floor_mat"/>
     <body name="world_link" pos="0 0 1"/>
+
+    <!-- Mocap body for visualizing the rotation center. It will be moved by the controller. -->
+    <body name="rotation_center_vis" mocap="true" pos="0 0 0">
+        <geom type="sphere" size="0.03" rgba="1 0 0 0.7" contype="0" conaffinity="0"/>
+    </body>
   </worldbody>
 
   <equality>

@@ -1,6 +1,6 @@
 <mujoco model="swerve_drive_robot">
   <!-- 
-    It's good practice to have compiler settings in the main included files.
+    Compiler settings for the robot model.
   -->
   <compiler inertiafromgeom="true"/>
 
@@ -13,36 +13,24 @@
     <material name="chassis_mat" rgba="0.2 0.5 0.8 1.0"/>
     <material name="pivot_mat"   rgba="0.6 0.6 0.6 1.0"/>
     <material name="wheel_mat"   rgba="0.1 0.1 0.1 1.0"/>
+    <material name="indicator_mat" rgba="1.0 0.8 0.0 1.0"/> <!-- Bright Yellow -->
   </asset>
 
   <!-- 
     ================================================================
-    Contact Section: Disabling self-collisions
+    Robot Body: Root of the robot model
     ================================================================
-    - The <exclude> tag prevents the physics engine from checking
-      for contacts between geoms in the specified bodies.
-    - Excluding a body from itself (e.g., body1="chassis" body2="chassis")
-      disables all collisions between geoms attached to that body and
-      all of its child bodies. This effectively disables all self-collision
-      for the entire robot.
-  -->
-  <contact>
-    <exclude body1="chassis" body2="chassis"/>
-  </contact>
-
-  <!-- 
-    ================================================================
-    Robot Body: This is the root of the robot model to be included.
-    ================================================================
+    Collision groups are now used to prevent self-collision.
+    - Group 0 (default): Environment (floor)
+    - Group 1 (contype="2"): Chassis and pivots
+    - Group 2 (contype="4"): Wheels
+    Geoms in group 1 and 2 are set to only collide with group 0.
   -->
   <worldbody>
-    <!-- 
-      The main body of the robot. It's positioned relative to where
-      this model is included. The free joint allows it to move in space.
-    -->
     <body name="chassis" pos="0 0 0.12">
       <joint name="root" type="free"/>
-      <geom name="chassis_geom" type="box" size="0.2 0.15 0.02" material="chassis_mat" mass="5"/>
+      <!-- CHASSIS GEOM: Assigned to group 1, collides with group 0. -->
+      <geom name="chassis_geom" type="box" size="0.2 0.15 0.02" material="chassis_mat" mass="5" contype="2" conaffinity="1"/>
 
       <!-- 
         ================================================================
@@ -51,10 +39,19 @@
       -->
       <body name="FR_pivot" pos="0.2 0.15 0">
         <joint name="FR_steer_joint" type="hinge" axis="0 0 1" pos="0 0 0"/>
-        <geom name="FR_pivot_geom" type="cylinder" size="0.04 0.03" material="pivot_mat" mass="0.2"/>
+        <!-- PIVOT GEOM: Assigned to group 1, collides with group 0. -->
+        <geom name="FR_pivot_geom" type="cylinder" size="0.04 0.03" material="pivot_mat" mass="0.2" contype="2" conaffinity="1"/>
         <body name="FR_wheel" pos="0 0 -0.05">
           <joint name="FR_drive_joint" type="hinge" axis="0 1 0" pos="0 0 0"/>
-          <geom name="FR_wheel_geom" type="cylinder" size="0.05 0.02" euler="90 0 0" material="wheel_mat" friction="1.5 0.02 0.02" mass="0.5"/>
+          <!-- 
+            WHEEL GEOM: Assigned to group 2, collides with group 0.
+            - condim="6": Enables 6D contacts and elliptic friction model.
+            - friction: [sliding_x, sliding_y, torsional] - Anisotropic friction with high resistance to sideways slip.
+            - solref/solimp: Parameters for a soft contact model, which is more stable and realistic for tires.
+          -->
+          <geom name="FR_wheel_geom" type="ellipsoid" size="0.05 0.02 0.05" material="wheel_mat" mass="0.5" contype="4" conaffinity="1" condim="6" friction="1.5 0.1 0.02" solref="0.02 1" solimp="0.9 0.95 0.001"/>
+          <!-- SPIN INDICATOR (non-colliding) -->
+          <geom name="FR_indicator" type="box" size="0.01 0.01 0.022" pos="0.03 0 0" euler="90 0 0" material="indicator_mat" contype="0" conaffinity="0"/>
         </body>
       </body>
       
@@ -65,10 +62,12 @@
       -->
       <body name="FL_pivot" pos="0.2 -0.15 0">
         <joint name="FL_steer_joint" type="hinge" axis="0 0 1" pos="0 0 0"/>
-        <geom name="FL_pivot_geom" type="cylinder" size="0.04 0.03" material="pivot_mat" mass="0.2"/>
+        <geom name="FL_pivot_geom" type="cylinder" size="0.04 0.03" material="pivot_mat" mass="0.2" contype="2" conaffinity="1"/>
         <body name="FL_wheel" pos="0 0 -0.05">
           <joint name="FL_drive_joint" type="hinge" axis="0 1 0" pos="0 0 0"/>
-          <geom name="FL_wheel_geom" type="cylinder" size="0.05 0.02" euler="90 0 0" material="wheel_mat" friction="1.5 0.02 0.02" mass="0.5"/>
+          <geom name="FL_wheel_geom" type="ellipsoid" size="0.05 0.02 0.05" material="wheel_mat" mass="0.5" contype="4" conaffinity="1" condim="6" friction="1.5 0.1 0.02" solref="0.02 1" solimp="0.9 0.95 0.001"/>
+          <!-- SPIN INDICATOR (non-colliding) -->
+          <geom name="FL_indicator" type="box" size="0.01 0.01 0.022" pos="0.03 0 0" euler="90 0 0" material="indicator_mat" contype="0" conaffinity="0"/>
         </body>
       </body>
 
@@ -79,10 +78,12 @@
       -->
       <body name="BR_pivot" pos="-0.2 0.15 0">
         <joint name="BR_steer_joint" type="hinge" axis="0 0 1" pos="0 0 0"/>
-        <geom name="BR_pivot_geom" type="cylinder" size="0.04 0.03" material="pivot_mat" mass="0.2"/>
+        <geom name="BR_pivot_geom" type="cylinder" size="0.04 0.03" material="pivot_mat" mass="0.2" contype="2" conaffinity="1"/>
         <body name="BR_wheel" pos="0 0 -0.05">
           <joint name="BR_drive_joint" type="hinge" axis="0 1 0" pos="0 0 0"/>
-          <geom name="BR_wheel_geom" type="cylinder" size="0.05 0.02" euler="90 0 0" material="wheel_mat" friction="1.5 0.02 0.02" mass="0.5"/>
+          <geom name="BR_wheel_geom" type="ellipsoid" size="0.05 0.02 0.05" material="wheel_mat" mass="0.5" contype="4" conaffinity="1" condim="6" friction="1.5 0.1 0.02" solref="0.02 1" solimp="0.9 0.95 0.001"/>
+          <!-- SPIN INDICATOR (non-colliding) -->
+          <geom name="BR_indicator" type="box" size="0.01 0.01 0.022" pos="0.03 0 0" euler="90 0 0" material="indicator_mat" contype="0" conaffinity="0"/>
         </body>
       </body>
 
@@ -93,10 +94,12 @@
       -->
       <body name="BL_pivot" pos="-0.2 -0.15 0">
         <joint name="BL_steer_joint" type="hinge" axis="0 0 1" pos="0 0 0"/>
-        <geom name="BL_pivot_geom" type="cylinder" size="0.04 0.03" material="pivot_mat" mass="0.2"/>
+        <geom name="BL_pivot_geom" type="cylinder" size="0.04 0.03" material="pivot_mat" mass="0.2" contype="2" conaffinity="1"/>
         <body name="BL_wheel" pos="0 0 -0.05">
           <joint name="BL_drive_joint" type="hinge" axis="0 1 0" pos="0 0 0"/>
-          <geom name="BL_wheel_geom" type="cylinder" size="0.05 0.02" euler="90 0 0" material="wheel_mat" friction="1.5 0.02 0.02" mass="0.5"/>
+          <geom name="BL_wheel_geom" type="ellipsoid" size="0.05 0.02 0.05" material="wheel_mat" mass="0.5" contype="4" conaffinity="1" condim="6" friction="1.5 0.1 0.02" solref="0.02 1" solimp="0.9 0.95 0.001"/>
+          <!-- SPIN INDICATOR (non-colliding) -->
+          <geom name="BL_indicator" type="box" size="0.01 0.01 0.022" pos="0.03 0 0" euler="90 0 0" material="indicator_mat" contype="0" conaffinity="0"/>
         </body>
       </body>
 
