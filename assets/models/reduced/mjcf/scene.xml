@@ -1,0 +1,43 @@
+<mujoco model="swerve_scene">
+  <!-- 
+    ================================================================
+    Compiler and Option Settings
+    ================================================================
+  -->
+  <compiler angle="degree" coordinate="local" inertiafromgeom="true"/>
+  <option integrator="RK4" timestep="0.01"/>
+
+  <!-- 
+    ================================================================
+    Assets and Includes
+    ================================================================
+  -->
+  <asset>
+    <material name="floor_mat" rgba="0.8 0.9 0.8 1.0"/>
+  </asset>
+
+  <!-- Include the robot's physical definition -->
+  <include file="robot.xml"/>
+  
+  <!-- 
+    Include the desired actuator model.
+    Change to "actuators_pos_vel.xml" to use position/velocity controllers.
+  -->
+  <include file="actuators_pos_vel.xml"/>
+   <!-- <include file="actuators_eff.xml"/> -->
+
+  <!-- 
+    ================================================================
+    World Body: Contains the environment elements
+    ================================================================
+  -->
+  <worldbody>
+    <light diffuse=".5 .5 .5" pos="0 0 4" dir="0 0 -1"/>
+    <geom name="floor" type="plane" size="5 5 0.1" material="floor_mat"/>
+    <body name="world_link" pos="0 0 1"/>
+  </worldbody>
+
+  <equality>
+    <weld name="gantry" body1="world_link" body2="chassis" relpose="0 0 0.05 1 0 0 0"/>
+  </equality>
+</mujoco>

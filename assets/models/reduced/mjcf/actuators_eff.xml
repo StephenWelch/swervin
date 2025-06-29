@@ -1,0 +1,22 @@
+<mujoco>
+  <!-- 
+    ================================================================
+    Actuators: Motors to control the joints via torque.
+    ================================================================
+    - Each motor is linked to a specific joint.
+    - The 'motor' actuator type applies a direct force/torque.
+  -->
+  <actuator>
+    <!-- Drive Motors (Torque) -->
+    <motor name="FR_drive_motor" joint="FR_drive_joint" gear="100" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="FL_drive_motor" joint="FL_drive_joint" gear="100" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="BR_drive_motor" joint="BR_drive_joint" gear="100" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="BL_drive_motor" joint="BL_drive_joint" gear="100" ctrllimited="true" ctrlrange="-1 1"/>
+
+    <!-- Steering Motors (Torque) -->
+    <motor name="FR_steer_motor" joint="FR_steer_joint" gear="100" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="FL_steer_motor" joint="FL_steer_joint" gear="100" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="BR_steer_motor" joint="BR_steer_joint" gear="100" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="BL_steer_motor" joint="BL_steer_joint" gear="100" ctrllimited="true" ctrlrange="-1 1"/>
+  </actuator>
+</mujoco>

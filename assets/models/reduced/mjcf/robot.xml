@@ -1,0 +1,105 @@
+<mujoco model="swerve_drive_robot">
+  <!-- 
+    It's good practice to have compiler settings in the main included files.
+  -->
+  <compiler inertiafromgeom="true"/>
+
+  <!-- 
+    ================================================================
+    Assets: Materials for visualization
+    ================================================================
+  -->
+  <asset>
+    <material name="chassis_mat" rgba="0.2 0.5 0.8 1.0"/>
+    <material name="pivot_mat"   rgba="0.6 0.6 0.6 1.0"/>
+    <material name="wheel_mat"   rgba="0.1 0.1 0.1 1.0"/>
+  </asset>
+
+  <!-- 
+    ================================================================
+    Contact Section: Disabling self-collisions
+    ================================================================
+    - The <exclude> tag prevents the physics engine from checking
+      for contacts between geoms in the specified bodies.
+    - Excluding a body from itself (e.g., body1="chassis" body2="chassis")
+      disables all collisions between geoms attached to that body and
+      all of its child bodies. This effectively disables all self-collision
+      for the entire robot.
+  -->
+  <contact>
+    <exclude body1="chassis" body2="chassis"/>
+  </contact>
+
+  <!-- 
+    ================================================================
+    Robot Body: This is the root of the robot model to be included.
+    ================================================================
+  -->
+  <worldbody>
+    <!-- 
+      The main body of the robot. It's positioned relative to where
+      this model is included. The free joint allows it to move in space.
+    -->
+    <body name="chassis" pos="0 0 0.12">
+      <joint name="root" type="free"/>
+      <geom name="chassis_geom" type="box" size="0.2 0.15 0.02" material="chassis_mat" mass="5"/>
+
+      <!-- 
+        ================================================================
+        Wheel Module 1: Front-Right (FR)
+        ================================================================
+      -->
+      <body name="FR_pivot" pos="0.2 0.15 0">
+        <joint name="FR_steer_joint" type="hinge" axis="0 0 1" pos="0 0 0"/>
+        <geom name="FR_pivot_geom" type="cylinder" size="0.04 0.03" material="pivot_mat" mass="0.2"/>
+        <body name="FR_wheel" pos="0 0 -0.05">
+          <joint name="FR_drive_joint" type="hinge" axis="0 1 0" pos="0 0 0"/>
+          <geom name="FR_wheel_geom" type="cylinder" size="0.05 0.02" euler="90 0 0" material="wheel_mat" friction="1.5 0.02 0.02" mass="0.5"/>
+        </body>
+      </body>
+      
+      <!-- 
+        ================================================================
+        Wheel Module 2: Front-Left (FL)
+        ================================================================
+      -->
+      <body name="FL_pivot" pos="0.2 -0.15 0">
+        <joint name="FL_steer_joint" type="hinge" axis="0 0 1" pos="0 0 0"/>
+        <geom name="FL_pivot_geom" type="cylinder" size="0.04 0.03" material="pivot_mat" mass="0.2"/>
+        <body name="FL_wheel" pos="0 0 -0.05">
+          <joint name="FL_drive_joint" type="hinge" axis="0 1 0" pos="0 0 0"/>
+          <geom name="FL_wheel_geom" type="cylinder" size="0.05 0.02" euler="90 0 0" material="wheel_mat" friction="1.5 0.02 0.02" mass="0.5"/>
+        </body>
+      </body>
+
+      <!-- 
+        ================================================================
+        Wheel Module 3: Back-Right (BR)
+        ================================================================
+      -->
+      <body name="BR_pivot" pos="-0.2 0.15 0">
+        <joint name="BR_steer_joint" type="hinge" axis="0 0 1" pos="0 0 0"/>
+        <geom name="BR_pivot_geom" type="cylinder" size="0.04 0.03" material="pivot_mat" mass="0.2"/>
+        <body name="BR_wheel" pos="0 0 -0.05">
+          <joint name="BR_drive_joint" type="hinge" axis="0 1 0" pos="0 0 0"/>
+          <geom name="BR_wheel_geom" type="cylinder" size="0.05 0.02" euler="90 0 0" material="wheel_mat" friction="1.5 0.02 0.02" mass="0.5"/>
+        </body>
+      </body>
+
+      <!-- 
+        ================================================================
+        Wheel Module 4: Back-Left (BL)
+        ================================================================
+      -->
+      <body name="BL_pivot" pos="-0.2 -0.15 0">
+        <joint name="BL_steer_joint" type="hinge" axis="0 0 1" pos="0 0 0"/>
+        <geom name="BL_pivot_geom" type="cylinder" size="0.04 0.03" material="pivot_mat" mass="0.2"/>
+        <body name="BL_wheel" pos="0 0 -0.05">
+          <joint name="BL_drive_joint" type="hinge" axis="0 1 0" pos="0 0 0"/>
+          <geom name="BL_wheel_geom" type="cylinder" size="0.05 0.02" euler="90 0 0" material="wheel_mat" friction="1.5 0.02 0.02" mass="0.5"/>
+        </body>
+      </body>
+
+    </body> <!-- End of chassis body -->
+  </worldbody>
+</mujoco>
