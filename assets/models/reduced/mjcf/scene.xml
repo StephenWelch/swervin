@@ -13,7 +13,8 @@
     ================================================================
   -->
   <asset>
-    <material name="floor_mat" rgba="0.8 0.9 0.8 1.0"/>
+    <texture name="grid_texture" type="2d" builtin="checker" width="300" height="300" rgb1="0 0 0" rgb2="0 0 0" mark="edge" markrgb="1 1 1"/>
+    <material name="floor_mat" texture="grid_texture" texrepeat="20 20" texuniform="false" specular="0" shininess="0" reflectance="0"/>
   </asset>
 
   <!-- Include the robot's physical definition -->
@@ -35,6 +36,9 @@
     <light diffuse=".5 .5 .5" pos="0 0 4" dir="0 0 -1"/>
     <geom name="floor" type="plane" size="5 5 0.1" material="floor_mat"/>
     <body name="world_link" pos="0 0 1"/>
+
+    <!-- A camera that tracks the chassis of the robot -->
+    <camera name="tracking_cam" mode="trackcom" target="chassis" pos="2 0 2"/>
 
     <!-- Mocap body for visualizing the rotation center. It will be moved by the controller. -->
     <body name="rotation_center_vis" mocap="true" pos="0 0 0">

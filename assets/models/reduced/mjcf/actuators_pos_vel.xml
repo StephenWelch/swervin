@@ -9,10 +9,10 @@
   <actuator>
     <!-- Drive Motors (Velocity Control) -->
     <!-- 'kv' is the velocity feedback gain. Control range is in rad/s. -->
-    <velocity name="FR_drive_motor" joint="FR_drive_joint" kv="0.1" ctrllimited="true" ctrlrange="-30 30"/>
-    <velocity name="FL_drive_motor" joint="FL_drive_joint" kv="0.1" ctrllimited="true" ctrlrange="-30 30"/>
-    <velocity name="BR_drive_motor" joint="BR_drive_joint" kv="0.1" ctrllimited="true" ctrlrange="-30 30"/>
-    <velocity name="BL_drive_motor" joint="BL_drive_joint" kv="0.1" ctrllimited="true" ctrlrange="-30 30"/>
+    <velocity name="FR_drive_motor" joint="FR_drive_joint" kv="0.1" ctrllimited="true" ctrlrange="-300 300"/>
+    <velocity name="FL_drive_motor" joint="FL_drive_joint" kv="0.1" ctrllimited="true" ctrlrange="-300 300"/>
+    <velocity name="BR_drive_motor" joint="BR_drive_joint" kv="0.1" ctrllimited="true" ctrlrange="-300 300"/>
+    <velocity name="BL_drive_motor" joint="BL_drive_joint" kv="0.1" ctrllimited="true" ctrlrange="-300 300"/>
 
     <!-- Steering Motors (Position Control) -->
     <!-- 'kp' is the position feedback gain (stiffness). Control range is in radians. -->

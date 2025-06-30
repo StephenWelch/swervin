@@ -5,6 +5,8 @@ import pygame
 import numpy as np
 import math
 import os
+import tkinter as tk
+from tkinter import ttk
 
 # --- Constants and Configuration ---
 MODEL_PATH = "assets/models/reduced/mjcf/scene.xml"
@@ -17,13 +19,65 @@ WHEEL_POSITIONS = np.array([
     [-0.2, -0.15]   # BL
 ])
 
-MAX_LINEAR_VELOCITY = 30.0  # m/s
-MAX_ANGULAR_VELOCITY = 300.0  # rad/s
+MAX_LINEAR_VELOCITY = 100.0  # m/s
+MAX_ANGULAR_VELOCITY = 100.0  # rad/s
 MAX_ROT_CENTER_OFFSET = 0.5 # meters
 
 # Actuator names from the XML file
 DRIVE_MOTORS = ["FR_drive_motor", "FL_drive_motor", "BR_drive_motor", "BL_drive_motor"]
 STEER_MOTORS = ["FR_steer_motor", "FL_steer_motor", "BR_steer_motor", "BL_steer_motor"]
+
+def select_joystick_gui(joystick_names):
+    """
+    Displays a GUI for joystick selection using Tkinter.
+    Returns the index of the selected joystick, or None if the user quits.
+    """
+    selection = {'index': None}
+
+    def on_select():
+        try:
+            selected_name = combo.get()
+            if selected_name:
+                selection['index'] = joystick_names.index(selected_name)
+                root.destroy()
+        except (ValueError, IndexError):
+            # This should not happen with a readonly combobox.
+            pass
+
+    def on_closing():
+        selection['index'] = None
+        root.destroy()
+
+    root = tk.Tk()
+    root.title("Select Joystick")
+    
+    # Center the window
+    window_width = 350
+    window_height = 150
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    center_x = int(screen_width / 2 - window_width / 2)
+    center_y = int(screen_height / 2 - window_height / 2)
+    root.geometry(f'{window_width}x{window_height}+{center_x}+{center_y}')
+    root.resizable(False, False)
+
+    label = ttk.Label(root, text="Please select a joystick:")
+    label.pack(pady=10, padx=20)
+
+    # Use a StringVar for the combobox for better state management
+    selected_joystick = tk.StringVar()
+    combo = ttk.Combobox(root, textvariable=selected_joystick, values=joystick_names, state="readonly", width=40)
+    if joystick_names:
+        combo.set(joystick_names[0])
+    combo.pack(pady=5, padx=20)
+
+    select_button = ttk.Button(root, text="Select and Start", command=on_select)
+    select_button.pack(pady=20)
+    
+    root.protocol("WM_DELETE_WINDOW", on_closing)
+    root.mainloop()
+
+    return selection['index']
 
 def swerve_inverse_kinematics(linear_vel, angular_vel, rot_center):
     """
@@ -58,17 +112,37 @@ def swerve_inverse_kinematics(linear_vel, angular_vel, rot_center):
 
 def main():
     """Main function to run the joystick controller."""
-    # --- Pygame Initialization ---
+    # --- Pygame Initialization for Joystick ---
     pygame.init()
     pygame.joystick.init()
 
-    if pygame.joystick.get_count() == 0:
+    # --- Joystick Selection GUI ---
+    joystick_count = pygame.joystick.get_count()
+    if joystick_count == 0:
+        # Use tkinter for the popup message for consistency
+        root = tk.Tk()
+        root.withdraw() # hide the main window
+        from tkinter import messagebox
+        messagebox.showerror("Error", "No joystick found. Please connect one.")
+        root.destroy()
         print("No joystick found. Please connect one.")
         return
 
-    joystick = pygame.joystick.Joystick(1)
-    joystick.init()
+    joystick_names = [pygame.joystick.Joystick(i).get_name() for i in range(joystick_count)]
+    
+    # We don't need pygame's display for the Tkinter GUI, but we must not quit it,
+    # as the event system is needed later.
+    # pygame.display.quit() # This was causing the error.
+    
+    selected_joystick_index = select_joystick_gui(joystick_names)
 
+    if selected_joystick_index is None:
+        print("No joystick selected. Exiting.")
+        pygame.quit()
+        return
+
+    joystick = pygame.joystick.Joystick(selected_joystick_index)
+    joystick.init()
     print(f"Initialized joystick: {joystick.get_name()}")
 
     # --- MuJoCo Initialization ---
@@ -88,7 +162,10 @@ def main():
     
     # Store previous steer angles for optimization
     last_steer_angles = np.zeros(len(STEER_MOTORS))
+    
+    camera_should_change = False
     def key_cb(keycode: int):
+        nonlocal camera_should_change
         if chr(keycode) == 'R':
             gantry_eq_id = model.equality("gantry").id
             if data.eq_active[gantry_eq_id] == 1:
@@ -97,8 +174,20 @@ def main():
                 data.eq_active[gantry_eq_id] = 1
                 # mujoco.mj_resetDataKeyframe(model, data, model.keyframe("home").id)
                 print("Releasing gantry")
+        elif chr(keycode) == 'C':
+            camera_should_change = True
 
     with mujoco.viewer.launch_passive(model, data, key_callback=key_cb) as viewer:
+        # Get the ID of the new tracking camera.
+        try:
+            tracking_cam_id = model.camera("tracking_cam").id
+            print(f"{model.camera('tracking_cam')}")
+        except KeyError:
+            print("Warning: Camera 'tracking_cam' not found. Camera switching will be disabled.")
+            tracking_cam_id = -1
+
+        is_tracking_cam_active = False
+
         # Get the ID of the mocap body for the rotation center visualization.
         try:
             mocap_id = model.body("rotation_center_vis").mocapid[0]
@@ -108,6 +197,20 @@ def main():
 
         while running and viewer.is_running():
             start_time = time.time()
+
+            # --- Handle Camera Switching ---
+            with viewer.lock():
+                if camera_should_change and tracking_cam_id != -1:
+                    if is_tracking_cam_active:
+                        print("Switching to free camera")
+                        viewer.cam.type = mujoco.mjtCamera.mjCAMERA_FREE
+                    else:
+                        print(f"Switching to tracking camera {tracking_cam_id}")
+                        viewer.cam.trackbodyid = model.body("chassis").id
+                        viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
+                    is_tracking_cam_active = not is_tracking_cam_active
+                    camera_should_change = False
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
@@ -118,8 +221,8 @@ def main():
             # --- Get Joystick Input ---
             # Xbox controller mapping can vary. This is a common setup.
             # Left stick: linear velocity
-            vx = -joystick.get_axis(1)  # Inverted Y axis
-            vy = joystick.get_axis(0)
+            vx = joystick.get_axis(0)  # Inverted Y axis
+            vy = -joystick.get_axis(1)
 
             # Right stick: center of rotation offset
             px = joystick.get_axis(2) 
@@ -141,7 +244,7 @@ def main():
 
 
             # Apply deadzones and scaling
-            deadzone = 0.015
+            deadzone = 0.1
             vx = 0 if abs(vx) < deadzone else vx
             vy = 0 if abs(vy) < deadzone else vy
             px = 0 if abs(px) < deadzone else px
