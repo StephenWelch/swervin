@@ -11,21 +11,47 @@ from tkinter import ttk
 # --- Constants and Configuration ---
 MODEL_PATH = "assets/models/reduced/mjcf/scene.xml"
 # Wheel locations (x, y) relative to the chassis center
-# FR, FL, BR, BL
+# From robot.xml, for the new square chassis.
 WHEEL_POSITIONS = np.array([
-    [0.2, 0.15],   # FR
-    [0.2, -0.15],  # FL
-    [-0.2, 0.15],  # BR
-    [-0.2, -0.15]   # BL
+    [0.2, 0.2],   # FR
+    [0.2, -0.2],  # FL
+    [-0.2, 0.2],  # BR
+    [-0.2, -0.2]   # BL
 ])
 
-MAX_LINEAR_VELOCITY = 100.0  # m/s
-MAX_ANGULAR_VELOCITY = 100.0  # rad/s
+MAX_LINEAR_VELOCITY = 1.0  # m/s
+MAX_ANGULAR_VELOCITY = 1.0  # rad/s
 MAX_ROT_CENTER_OFFSET = 0.5 # meters
+WHEEL_RADIUS = 0.05 / 2 # meters, from robot.xml's wheel geom size
 
 # Actuator names from the XML file
 DRIVE_MOTORS = ["FR_drive_motor", "FL_drive_motor", "BR_drive_motor", "BL_drive_motor"]
 STEER_MOTORS = ["FR_steer_motor", "FL_steer_motor", "BR_steer_motor", "BL_steer_motor"]
+
+def add_arrow(viewer, pos, vec, scale, radius, rgba):
+    """Adds a single arrow to the user scene."""
+    if viewer.user_scn.ngeom + 1 > viewer.user_scn.maxgeom:
+        print("Warning: not enough geoms in user scene to draw velocity arrows.")
+        return
+    
+    if np.linalg.norm(vec) < 1e-5:
+        return
+
+    start_pos = pos
+    end_pos = pos + vec * scale
+    
+    mujoco.mjv_connector(
+        viewer.user_scn.geoms[viewer.user_scn.ngeom],
+        mujoco.mjtGeom.mjGEOM_ARROW,
+        radius, # width
+        start_pos,
+        end_pos
+    )
+    # Set material to none, so that rgba is used.
+    geom = viewer.user_scn.geoms[viewer.user_scn.ngeom]
+    geom.matid = -1
+    geom.rgba[:] = rgba
+    viewer.user_scn.ngeom += 1
 
 def select_joystick_gui(joystick_names):
     """
@@ -196,9 +222,8 @@ def main():
 
             # --- Handle Camera Switching ---
             if camera_should_change:
-                if viewer.cam.fixedcamid == tracking_cam_id:
+                if viewer.cam.type == mujoco.mjtCamera.mjCAMERA_TRACKING:
                     print("Switching to free camera")
-                    viewer.cam.fixedcamid = -1
                     viewer.cam.type = mujoco.mjtCamera.mjCAMERA_FREE
                 else:
                     print(f"Switching to tracking camera {tracking_cam_id}")
@@ -264,34 +289,42 @@ def main():
             mujoco.mju_rotVecQuat(linear_velocity_body_3d, linear_velocity_world_3d, inv_chassis_quat)
             linear_velocity_body = linear_velocity_body_3d[:2]
 
-            # --- Update visualization for rotation center ---
-            # The rotation_center is in the chassis frame.
-            # We need to transform it to the world frame for the visualization geom.
+            # --- Visualization ---
+            # Get chassis position for visualization origins
             chassis_pos = data.body("chassis").xpos
             chassis_quat = data.body("chassis").xquat
 
-            # Local position of rotation center
+            # Add a Z-offset to the arrow origins to draw them above the robot
+            ARROW_Z_OFFSET = 0.2
+            arrow_origin_pos = chassis_pos.copy()
+            arrow_origin_pos[2] += ARROW_Z_OFFSET
+
+            # --- Rotation Center Sphere ---
             rot_center_local = np.array([rotation_center[0], rotation_center[1], 0])
-            
-            # Rotated offset in world frame
             offset_world = np.empty(3)
             mujoco.mju_rotVecQuat(offset_world, rot_center_local, chassis_quat)
-
-            # World position of rotation center
             rot_center_world = chassis_pos + offset_world
-            
-            # Add a decorative sphere to the scene for the rotation center
             if viewer.user_scn.ngeom < viewer.user_scn.maxgeom:
                 geom = viewer.user_scn.geoms[viewer.user_scn.ngeom]
                 mujoco.mjv_initGeom(
-                    geom,
-                    mujoco.mjtGeom.mjGEOM_SPHERE,
-                    np.array([0.03, 0.0, 0.0]),
-                    rot_center_world,
-                    np.identity(3).flatten(),
-                    np.array([1.0, 0.0, 0.0, 0.7])
-                )
+                    geom, 2, np.array([0.03, 0.0, 0.0]), # mjGEOM_SPHERE
+                    rot_center_world, np.identity(3).flatten(), np.array([1.0, 0.0, 0.0, 0.7]))
                 viewer.user_scn.ngeom += 1
+            
+            # --- Velocity Arrows ---
+            VEL_ARROW_SCALE = 0.3
+            ARROW_RADIUS = 0.015
+            
+            # Desired velocity (green arrow)
+            desired_vel_3d = np.array([linear_velocity_world_2d[0], linear_velocity_world_2d[1], 0])
+            add_arrow(viewer, arrow_origin_pos, desired_vel_3d, VEL_ARROW_SCALE, ARROW_RADIUS, [0.0, 1.0, 0.0, 0.8])
+            
+            # Actual velocity (blue arrow)
+            chassis_id = model.body("chassis").id
+            vel_buffer = np.empty(6)
+            mujoco.mj_objectVelocity(model, data, 1, chassis_id, vel_buffer, 0) # mjOBJ_BODY
+            actual_vel_3d = vel_buffer[3:]
+            add_arrow(viewer, arrow_origin_pos, actual_vel_3d, VEL_ARROW_SCALE, ARROW_RADIUS, [0.0, 0.0, 1.0, 0.8])
 
             # --- Inverse Kinematics ---
             drive_speeds, steer_angles = swerve_inverse_kinematics(
@@ -319,7 +352,8 @@ def main():
 
             # --- Set Actuator Controls ---
             for i, name in enumerate(DRIVE_MOTORS):
-                data.ctrl[model.actuator(name).id] = drive_speeds[i]
+                angular_drive_speed = drive_speeds[i] / WHEEL_RADIUS
+                data.ctrl[model.actuator(name).id] = angular_drive_speed
 
             for i, name in enumerate(STEER_MOTORS):
                 data.ctrl[model.actuator(name).id] = steer_angles[i]
