@@ -188,28 +188,24 @@ def main():
 
         is_tracking_cam_active = False
 
-        # Get the ID of the mocap body for the rotation center visualization.
-        try:
-            mocap_id = model.body("rotation_center_vis").mocapid[0]
-        except (KeyError, IndexError):
-            print("Warning: Mocap body 'rotation_center_vis' not found in the model. Visualization will be disabled.")
-            mocap_id = -1
-
         while running and viewer.is_running():
             start_time = time.time()
 
+            # Reset the user scene before adding new geoms.
+            viewer.user_scn.ngeom = 0
+
             # --- Handle Camera Switching ---
-            with viewer.lock():
-                if camera_should_change and tracking_cam_id != -1:
-                    if is_tracking_cam_active:
-                        print("Switching to free camera")
-                        viewer.cam.type = mujoco.mjtCamera.mjCAMERA_FREE
-                    else:
-                        print(f"Switching to tracking camera {tracking_cam_id}")
-                        viewer.cam.trackbodyid = model.body("chassis").id
-                        viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
-                    is_tracking_cam_active = not is_tracking_cam_active
-                    camera_should_change = False
+            if camera_should_change:
+                if viewer.cam.fixedcamid == tracking_cam_id:
+                    print("Switching to free camera")
+                    viewer.cam.fixedcamid = -1
+                    viewer.cam.type = mujoco.mjtCamera.mjCAMERA_FREE
+                else:
+                    print(f"Switching to tracking camera {tracking_cam_id}")
+                    viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
+                    viewer.cam.trackbodyid = model.body("chassis").id
+                is_tracking_cam_active = not is_tracking_cam_active
+                camera_should_change = False
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -225,8 +221,8 @@ def main():
             vy = -joystick.get_axis(1)
 
             # Right stick: center of rotation offset
-            px = joystick.get_axis(2) 
-            py = -joystick.get_axis(3) # Inverted Y axis
+            px = -joystick.get_axis(3) 
+            py = -joystick.get_axis(2) # Inverted Y axis
 
             # Triggers: angular velocity
             # LT (axis 4) and RT (axis 5) are often 0 to 1
@@ -234,8 +230,8 @@ def main():
             # Let's assume they are mapped to axis 4 and 5 from -1 to 1.
             # On Windows they are axis 4 and 5, but might be different on other OS.
             try:
-                rt_trigger = (joystick.get_axis(5) + 1) / 2 # Right trigger (clockwise)
-                lt_trigger = (joystick.get_axis(4) + 1) / 2 # Left trigger (counter-clockwise)
+                rt_trigger = (joystick.get_axis(4) + 1) / 2 # Right trigger (clockwise)
+                lt_trigger = (joystick.get_axis(5) + 1) / 2 # Left trigger (counter-clockwise)
                 omega = (rt_trigger - lt_trigger)
             except pygame.error:
                 # Fallback for controllers with fewer axes (e.g. axis 2 for triggers)
@@ -269,23 +265,33 @@ def main():
             linear_velocity_body = linear_velocity_body_3d[:2]
 
             # --- Update visualization for rotation center ---
-            if mocap_id != -1:
-                # The rotation_center is in the chassis frame.
-                # We need to transform it to the world frame for the mocap body.
-                chassis_pos = data.body("chassis").xpos
+            # The rotation_center is in the chassis frame.
+            # We need to transform it to the world frame for the visualization geom.
+            chassis_pos = data.body("chassis").xpos
+            chassis_quat = data.body("chassis").xquat
 
-                # Local position of rotation center
-                rot_center_local = np.array([rotation_center[0], rotation_center[1], 0])
-                
-                # Rotated offset in world frame
-                offset_world = np.empty(3)
-                mujoco.mju_rotVecQuat(offset_world, rot_center_local, chassis_quat)
+            # Local position of rotation center
+            rot_center_local = np.array([rotation_center[0], rotation_center[1], 0])
+            
+            # Rotated offset in world frame
+            offset_world = np.empty(3)
+            mujoco.mju_rotVecQuat(offset_world, rot_center_local, chassis_quat)
 
-                # World position of rotation center
-                rot_center_world = chassis_pos + offset_world
-                
-                # Set the position of the mocap body
-                data.mocap_pos[mocap_id] = rot_center_world
+            # World position of rotation center
+            rot_center_world = chassis_pos + offset_world
+            
+            # Add a decorative sphere to the scene for the rotation center
+            if viewer.user_scn.ngeom < viewer.user_scn.maxgeom:
+                geom = viewer.user_scn.geoms[viewer.user_scn.ngeom]
+                mujoco.mjv_initGeom(
+                    geom,
+                    mujoco.mjtGeom.mjGEOM_SPHERE,
+                    np.array([0.03, 0.0, 0.0]),
+                    rot_center_world,
+                    np.identity(3).flatten(),
+                    np.array([1.0, 0.0, 0.0, 0.7])
+                )
+                viewer.user_scn.ngeom += 1
 
             # --- Inverse Kinematics ---
             drive_speeds, steer_angles = swerve_inverse_kinematics(

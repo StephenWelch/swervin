@@ -5,7 +5,7 @@
     ================================================================
   -->
   <compiler angle="degree" coordinate="local" inertiafromgeom="true"/>
-  <option integrator="RK4" timestep="0.01"/>
+  <option integrator="RK4" timestep="0.001"/>
 
   <!-- 
     ================================================================
@@ -39,11 +39,6 @@
 
     <!-- A camera that tracks the chassis of the robot -->
     <camera name="tracking_cam" mode="trackcom" target="chassis" pos="2 0 2"/>
-
-    <!-- Mocap body for visualizing the rotation center. It will be moved by the controller. -->
-    <body name="rotation_center_vis" mocap="true" pos="0 0 0">
-        <geom type="sphere" size="0.03" rgba="1 0 0 0.7" contype="0" conaffinity="0"/>
-    </body>
   </worldbody>
 
   <equality>
